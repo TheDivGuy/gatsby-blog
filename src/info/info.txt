@@ -1,0 +1,140 @@
+// create new
+npx gatsby new nombre-projecto
+
+// lanzarlo
+npm run develop
+
+// añadir blog en markdown
+- crear carpeta markdown-pages en src
+- meter en esa carpeta los archivos .md
+- en gatsby-config.js añadir en plugins despues de imagenes:
+    {
+      resolve: `gatsby-source-filesystem`,
+      options: {
+        name: `markdowns`,
+        path: `${__dirname}/src/markdown-pages`,
+      },
+    },
+- reiniciar
+
+// acceder al contenido del markdown
+- instalar transformer: npm install gatsby-transformer-remark
+- añadir en gatsby-config.js en plugins `gatsby-transformer-remark`,
+- en ___graphql allMarkdownRemark, frontmatter, html podemos ver el contenido
+
+// usar el markdown en index
+- importar: import { graphql, Link } from "gatsby"
+- sustituir export por:
+export const query = graphql`
+query {
+  allMarkdownRemark {
+    totalCount
+    edges {
+      node {
+        id
+        frontmatter {
+          title
+          date
+          description
+        }
+        html
+        excerpt
+        }
+      }
+    }
+  }
+`
+
+- sustituir const index = ()... por: export default ({ data })
+- ahora se puede acceder al contenido a traves de data siguiendo la query de graphql
+- pej: data.allMarkdownRemark.totalCount
+
+// crear paginas
+- sustituimos el contenido de gatsby-node.js por:
+const path = require(`path`);
+const { createFilePath } = require(`gatsby-source-filesystem`)
+
+exports.onCreateNode = ({ node, getNode, actions }) => {
+    const { createNodeField } = actions
+    if (node.internal.type === `MarkdownRemark`) {
+        const slug = createFilePath({ node, getNode })
+
+        createNodeField({
+            node,
+            name: `slug`,
+            value: slug
+        })
+    }
+}
+
+exports.createPages = ({ graphql, actions }) => {
+    const { createPage } = actions
+    return graphql(`
+    {
+        allMarkdownRemark {
+          edges {
+            node {
+              fields {
+                slug
+              }
+            }
+          }
+        }
+      }
+    `).then(result => {
+        result.data.allMarkdownRemark.edges.forEach(({node}) => {
+            createPage({
+                path: node.fields.slug,
+                component: path.resolve(`./src/templates/blog-post.js`),
+                context: {
+                    slug: node.fields.slug
+                }
+            })
+        })
+    })
+}
+
+- en src creamos una nueva carpeta templates y en ella blog-post.js
+- blog-post.js sera el template para nuestras paginas:
+
+import React from 'react';
+import { graphql } from 'gatsby';
+import Layout from '../components/layout';
+
+export default ({ data }) => {
+    const post = data.markdownRemark;
+    return (
+        <Layout>
+            <div>
+                <h1>{post.frontmatter.title}</h1>
+                <div dangerouslySetInnerHTML={{__html: post.html}}/>
+            </div>
+        </Layout>
+    );
+}
+
+export const query = graphql`
+    query($slug: String!) {
+        markdownRemark(fields: { slug: { eq: $slug } }) {
+            html
+            frontmatter {
+                title
+            }
+        }
+    }
+`
+
+- reiniciamos y ya tenemos acceso a las paginas en las rutas fields slug que aparezcan en graphql
+
+// organizar los post por fecha descendente y acceso a los links
+
+- en index.js query modificamos allMarkdownRemark: allMarkdownRemark(sort: { fields: [frontmatter___date], order: DESC })
+- dentro de node añadimos:
+fields {
+  slug
+}
+
+// styling
+- npm install gatsby-plugin-styled-components styled-components babel-plugin-styled-components
+- incluir en gatsby-config.js: `gatsby-plugin-styled-components`,
+- importar en index: import styled from "styled-components"
